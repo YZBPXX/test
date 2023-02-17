@@ -14,7 +14,7 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/data/storage1/nas/bo.zhu/checkpoints/diffusion/sd-model-0216-text-arcface-face-loss/",
+        default="/data/storage1/nas/bo.zhu/checkpoints/diffusion/sd-model-0217-text-arcface-face-loss/",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(

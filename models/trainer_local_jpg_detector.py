@@ -26,6 +26,7 @@ from utils.arcface.face_align import alignment_procedure
 from utils.face_center_crop_images import process_image, crop_and_mask_image
 from utils.yoloface.detector_align import YoloFace
 from utils.face_region_grid_sample import GridSampler
+from utils.read_dir import get_file_from_dir
 
 
 torch.set_num_threads(4)
@@ -69,6 +70,9 @@ class Trainer:
         self.detector = YoloFace(self.RANK % 8)
         self.recognizer = ArcFace_Onnx(self.RANK % 8)
         self.recognizer_pth = Arcface()
+        self.image_files = get_file_from_dir(
+            '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
+        )
 
         # Freeze vae and text_encoder
         self.vae.requires_grad_(True)

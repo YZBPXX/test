@@ -29,14 +29,14 @@ class ImageData(data.Dataset):
             detector_input = self.yolo_transforms(detector_input)
 
             # load prompt
-            if '' in self.files[data_index]:
+            if 'mj_yzb_0213' in self.files[data_index]:
                 prompt_path = self.files[data_index].replace('.jpg', '.json')
                 prompt = self.load_prompt(prompt_path)
                 prompt_list = prompt.split(' ')
                 if prompt_list[0].endswith(('.jpg', '.png')):
                     prompt = ' '.join(prompt_list[1:])
                 prompt = 'sai style, ' + prompt
-            elif '' in self.files[data_index]:
+            elif 'see' in self.files[data_index]:
                 prompt = 'sai style, a people'
             else:
                 prompt = 'a people'
