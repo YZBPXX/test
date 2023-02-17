@@ -67,10 +67,7 @@ class GridSampler:
 
     @staticmethod
     def grid_samle(face_tensor, angle):
-        b, c, h, w = face_tensor.shape
         theta = [
-            # [np.cos(angle) * w / h, -np.sin(angle), 0.],
-            # [np.sin(angle), np.cos(angle) * w / h, 0.]
             [np.cos(angle), -np.sin(angle), 0.],
             [np.sin(angle), np.cos(angle), 0.]
         ]
@@ -87,14 +84,8 @@ class GridSampler:
         aligned_face_tensor = self.grid_samle(face_tensor, angle)
         return aligned_face_tensor
 
-    def run(self, image, pred):
+    def run(self, image_tensor, pred):
         bbox, landmarks = self.pred2grid(pred)
-        x = torch.from_numpy(original)
-        x = x.type(torch.FloatTensor)
-        x = torch.unsqueeze(x, 0)
-        x = x.permute(0, 3, 1, 2)
-        face_tesnor = self.grid_sampler.run(x, bbox, landmarks)
-
         face_tensor = self.crop_tensor(image_tensor, bbox)
         left_eye, right_eye = landmarks
         angle = self.cal_angle(left_eye, right_eye)

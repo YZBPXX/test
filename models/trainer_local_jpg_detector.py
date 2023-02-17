@@ -24,6 +24,7 @@ from utils.arcface.recognizor import ArcFace_Onnx
 from utils.arcface.face_align import alignment_procedure
 from utils.face_center_crop_images import process_image, crop_and_mask_image
 from utils.yoloface.detector_align import YoloFace
+from utils.face_region_grid_sample import GridSampler
 
 
 torch.set_num_threads(4)
@@ -76,6 +77,7 @@ class Trainer:
         self.text_encoder.to(self.accelerator.device, dtype=self.weight_dtype)
         self.vae.to(self.accelerator.device, dtype=self.weight_dtype)
         self.recognizer_pth.to(self.accelerator.device, dtype=self.weight_dtype)
+        self.grid_sampler = GridSampler()
 
         # Initialize the optimizer and scheduler
         self.optimizer = torch.optim.AdamW(
@@ -196,7 +198,6 @@ class Trainer:
         while len(sqrt_one_minus_alpha_prod.shape) < len(noisy_latents.shape):
             sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
 
-        # noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
         latents = (noisy_latents - sqrt_one_minus_alpha_prod * noise) / sqrt_alpha_prod
         return latents
 
@@ -230,12 +231,11 @@ class Trainer:
                     latents = latents * 0.18215
                     detector_input = batch["detector_input"].numpy().permute(0, 2, 3, 1)
 
-                    # preds = [self.detector.detect(image) for image in detector_input]
-                    # inds_input = [True if len(pred) == 1 else False for pred in preds]
                     preds = [self.detector.detect_and_align(image) for image in detector_input]
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
                     faces = [pred[0] for pred in preds if len(pred) == 1]
                     faces = np.array(faces)
+                    faces = np.array([self.arcface_transform(face) for face in faces])
                     face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                     embeddings = self.proj(face_embeddings)
 
@@ -256,42 +256,42 @@ class Trainer:
                     images = latents.copy().detach().cpu().permute(0, 2, 3, 1).float().numpy()
                     images = (images * 255).round().astype("uint8")
                     images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
-                    all_faces = []
+                    all_preds = []
                     for image in images:
                         try:
-                            faces = self.detector.detect(image)
+                            preds = self.detector.detect(image)
                         except Exception as e:
-                            all_faces.append(None)
+                            all_preds.append(None)
                             continue
-                        if faces:
-                            all_faces.append(faces[0])
+                        if preds:
+                            all_preds.append(preds[0])
                         else:
-                            all_faces.append(None)
+                            all_preds.append(None)
 
-                    inds_output = [False if pred is None else True for pred in all_faces]
+                    inds_output = [False if pred is None else True for pred in all_preds]
                     # inds_cal_loss = [i & j for i, j in zip(inds_input, inds_output)]
                     embeddings_gt = face_embeddings[inds_input][inds_output]
 
                     embeddings = []
-                    for face_ind, face in enumerate(all_faces):
-                        if face is not None:
+                    for face_ind, pred in enumerate(all_preds):
+                        if pred is not None:
+                            face = self.grid_sampler.run(latents[face_ind], pred)
+                            face /= 255.0
+                            face -= 0.5
+                            face /= 0.5
                             embedding = torch.Tensor(self.recognizer.extract(face)).to(
                                 memory_format=torch.contiguous_format).float().to(self.accelerator.device)
                         else:
-                            embedding = batch["embedding"][face_ind].unsqueeze(0).to(self.accelerator.device)
+                            embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
                         embeddings.append(embedding)
 
                     # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
                     embeddings = torch.concat(embeddings, dim=0)
-                    source_embeddings = batch["embedding"]
                     # print(source_embeddings.shape, embeddings.shape)
-                    distance = self.compute_dist(source_embeddings, embeddings)
+                    cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
 
 
-                    loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
-
-                    # for param in self.unet.parameters():
-                    #     print('self.unet', param.grad)
+                    loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
 
                     # Gather the losses across all processes for logging (if we use distributed training).
                     avg_loss = self.accelerator.gather(loss.repeat(self.args.train_batch_size)).mean()
@@ -325,13 +325,11 @@ class Trainer:
                     return
 
                 if self.RANK == 0 and global_step % 5000 == 0 and global_step != 0:
-                # if self.RANK == 0 and global_step % 5000 == 0 :
                     pipeline = StableDiffusionPipeline(
                         text_encoder=self.text_encoder,
                         vae=self.vae,
                         unet=self.accelerator.unwrap_model(self.unet),
                         tokenizer=self.tokenizer,
-                        # scheduler=self.noise_scheduler,
                         scheduler=EulerAncestralDiscreteScheduler(
                             beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000,
                         ),
@@ -344,7 +342,6 @@ class Trainer:
                     torch.save(
                         self.proj.state_dict(),
                         self.args.output_dir + '/%d_%d/' % (1, global_step) + 'proj.ckpt',
-                        # self.accelerator.unwrap_model(self.proj)
                     )
 
         self.accelerator.end_training()
