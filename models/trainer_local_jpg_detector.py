@@ -19,6 +19,7 @@ from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNe
 from torchvision import transforms
 from datas.image_file_dataset import ImageData
 from models.arcface_proj import ArcFaceProj
+from utils.arcface.arcface_res50_model import Arcface
 from utils.read_dir import get_file_from_dir
 from utils.arcface.recognizor import ArcFace_Onnx
 from utils.arcface.face_align import alignment_procedure
@@ -289,7 +290,6 @@ class Trainer:
                     embeddings = torch.concat(embeddings, dim=0)
                     # print(source_embeddings.shape, embeddings.shape)
                     cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
-
 
                     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
 

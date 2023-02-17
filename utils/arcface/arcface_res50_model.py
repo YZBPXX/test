@@ -7,13 +7,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Model(nn.Module):
-  def __init__(self):
-    super(Model, self).__init__()
+class Arcface(nn.Module):
+  def __init__(self, dir='/data/storage1/nas/bo.zhu/checkpoints/arcface/webface_r50_pytorch/'):
+    super(Arcface, self).__init__()
     self._vars = nn.ParameterDict()
     self._regularizer_params = []
     for b in glob.glob(
-        os.path.join(os.path.dirname(__file__), "variables", "*.npy")):
+        # os.path.join(os.path.dirname(__file__), "variables", "*.npy")):
+        os.path.join(dir, "variables", "*.npy")):
       v = torch.from_numpy(np.load(b))
       requires_grad = v.dtype.is_floating_point or v.dtype.is_complex
       self._vars[os.path.basename(b)[:-4]] = nn.Parameter(v, requires_grad=requires_grad)
