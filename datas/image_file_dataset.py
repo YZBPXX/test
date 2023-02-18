@@ -24,8 +24,8 @@ class ImageData(data.Dataset):
         # try:
         # load image
         image = Image.open(self.files[data_index]).convert("RGB")
+        detector_input = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
         pixel_values = self.vae_transforms(image)
-        detector_input = cv2.cvtColor(np.array(pixel_values), cv2.COLOR_BGR2RGB)
         detector_input = self.yolo_transforms(detector_input)
 
         # load prompt
