@@ -244,7 +244,7 @@ class Trainer:
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
                     faces = [pred[0] for pred in preds if len(pred) == 1]
                     faces = np.array(faces)
-                    faces = np.array([self.arcface_transform(face) for face in faces])
+                    faces = np.array([self.arcface_transform(face) for face in faces]).astype(float)
                     face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                     embeddings = self.proj(face_embeddings)
 
