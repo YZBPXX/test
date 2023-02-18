@@ -77,6 +77,7 @@ class GridSampler:
         theta = torch.Tensor(theta).unsqueeze(0).to(device)
         # grid is of size NxHxWx2
         grid = F.affine_grid(theta, face_tensor.size(), align_corners=False)
+        grid = F.affine_grid(theta, torch.Size((1, 3, 112, 112)), align_corners=False)
         x = F.grid_sample(face_tensor, grid, align_corners=False)
         return x
 
