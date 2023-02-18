@@ -158,7 +158,7 @@ class Trainer:
         self.image_dataset = ImageData(self.image_files, self.vae_transforms, self.yolo_transforms, self.tokenizer)
         self.train_dataloader = iter(
             torch.utils.data.DataLoader(
-                self.image_dataset, shuffle=True, collate_fn=self.collate_fn, batch_size=1
+                self.image_dataset, shuffle=True, collate_fn=self.collate_fn, batch_size=args.train_batch_size
             )
         )
         self.unet, self.proj, self.optimizer, self.optimizer_proj, self.train_dataloader, self.lr_scheduler = self.accelerator.prepare(
