@@ -135,9 +135,10 @@ class Trainer:
         )
         self.yolo_transforms = transforms.Compose(
             [
+                transforms.ToPILImage(),
                 transforms.RandomResizedCrop(self.args.resolution, scale=(1.0, 1.0), ratio=(1.0, 1.0)),
                 transforms.RandomHorizontalFlip(),
-                # transforms.ToTensor(),
+                transforms.ToTensor(),
             ]
         )
         self.arcface_transform = transforms.Compose(
