@@ -21,36 +21,36 @@ class ImageData(data.Dataset):
         return prompt
 
     def __getitem__(self, data_index):
-        try:
-            # load image
-            image = Image.open(self.files[data_index]).convert("RGB")
-            pixel_values = self.vae_transforms(image)
-            detector_input = cv2.cvtColor(np.array(pixel_values), cv2.COLOR_BGR2RGB)
-            detector_input = self.yolo_transforms(detector_input)
+        # try:
+        # load image
+        image = Image.open(self.files[data_index]).convert("RGB")
+        pixel_values = self.vae_transforms(image)
+        detector_input = cv2.cvtColor(np.array(pixel_values), cv2.COLOR_BGR2RGB)
+        detector_input = self.yolo_transforms(detector_input)
 
-            # load prompt
-            if 'mj_yzb_0213' in self.files[data_index]:
-                prompt_path = self.files[data_index].replace('.jpg', '.json')
-                prompt = self.load_prompt(prompt_path)
-                prompt_list = prompt.split(' ')
-                if prompt_list[0].endswith(('.jpg', '.png')):
-                    prompt = ' '.join(prompt_list[1:])
-                prompt = 'sai style, ' + prompt
-            elif 'aahq-dataset' in self.files[data_index]:
-                prompt = 'sai style'
-            else:
-                prompt = 'a people'
+        # load prompt
+        if 'mj_yzb_0213' in self.files[data_index]:
+            prompt_path = self.files[data_index].replace('.jpg', '.json')
+            prompt = self.load_prompt(prompt_path)
+            prompt_list = prompt.split(' ')
+            if prompt_list[0].endswith(('.jpg', '.png')):
+                prompt = ' '.join(prompt_list[1:])
+            prompt = 'sai style, ' + prompt
+        elif 'aahq-dataset' in self.files[data_index]:
+            prompt = 'sai style'
+        else:
+            prompt = 'a people'
 
-            inputs = self.tokenizer(
-                prompt, max_length=self.tokenizer.model_max_length,
-                padding="do_not_pad",
-                truncation=True
-            )
-            input_ids = inputs.input_ids
+        inputs = self.tokenizer(
+            prompt, max_length=self.tokenizer.model_max_length,
+            padding="do_not_pad",
+            truncation=True
+        )
+        input_ids = inputs.input_ids
 
-        except Exception as e:
-            print(self.files[data_index], e)
-            return None
+        # except Exception as e:
+        #     print(self.files[data_index], e)
+        #     return None
 
         return {
             "pixel_values": pixel_values,
