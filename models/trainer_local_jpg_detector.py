@@ -73,8 +73,8 @@ class Trainer:
         # self.image_files = get_file_from_dir(
         #     '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
         # )
-        # with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
-        with open('/data/storage1/public/bo.zhu/datasets/text2img/train_face_0218.idx', 'r') as f:
+        with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
+        # with open('/data/storage1/public/bo.zhu/datasets/text2img/train_face_0218.idx', 'r') as f:
             image_files = f.readlines()
             self.image_files = [file[:-1] for file in image_files]
 
@@ -244,26 +244,26 @@ class Trainer:
                     latents = latents * 0.18215
                     detector_input = batch["detector_input"].permute(0, 2, 3, 1).cpu().numpy() * 255
                     detector_input = detector_input.astype(np.uint8)
-                    for i, j in enumerate(detector_input):
-                        cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
+                    # for i, j in enumerate(detector_input):
+                    #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
 
                     preds = [self.detector.detect_and_align(image) for image in detector_input]
                     # print(len(preds), 'len preds')
                     # for faces in preds:
                     #     print(len(faces), 'face count in each image')
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
-                    faces = [pred[0] for pred in preds if len(pred) == 1]
+                    faces = [pred[0] if len(pred) == 1 else np.zeros((112, 112, 3)) for pred in preds]
                     encoder_hidden_states = self.text_encoder(batch["input_ids"].to(self.accelerator.device))[0]
                     # print(len(faces), 'len faces')
 
-                    if len(faces):
-                        # faces = np.array(faces)
-                        # print(faces.shape)
-                        faces = [self.arcface_transform(face) for face in faces]
-                        faces = np.stack(faces, axis=0).astype(np.float32)
-                        face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
-                        embeddings = self.proj(face_embeddings)
-                        encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
+                    # if len(faces):
+                    # faces = np.array(faces)
+                    # print(faces.shape)
+                    faces = [self.arcface_transform(face) for face in faces]
+                    faces = np.stack(faces, axis=0).astype(np.float32)
+                    face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
+                    embeddings = self.proj(face_embeddings)
+                    encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
 
                     noise = torch.randn_like(latents)
                     timesteps = torch.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],), device=latents.device)
@@ -271,57 +271,60 @@ class Trainer:
                     noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
                     # Predict the noise residual and compute loss
                     noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
-                    if not len(faces):
-                        loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
-                    else:
-                        print('decoding', len(noisy_latents[inds_input]))
-                        latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
-                        latents = 1 / 0.18215 * latents
-                        latents = self.vae.decode(latents).sample
-                        latents = (latents / 2 + 0.5).clamp(0, 1)
-                        images = latents.copy().detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                        images = (images * 255).round().astype("uint8")
-                        images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
-                        all_preds = []
-                        for image in images:
-                            try:
-                                preds = self.detector.detect(image)
-                            except Exception as e:
-                                print(e)
-                                all_preds.append(None)
-                                continue
-                            if preds:
-                                all_preds.append(preds[0])
-                            else:
-                                all_preds.append(None)
+                    # if not len(faces):
+                    #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+                    # else:
+                    # print('decoding', len(noisy_latents[inds_input]))
+                    latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
+                    latents = 1 / 0.18215 * latents
+                    latents = self.vae.decode(latents).sample
+                    latents = (latents / 2 + 0.5).clamp(0, 1)
+                    images = latents.copy().detach().cpu().permute(0, 2, 3, 1).float().numpy()
+                    images = (images * 255).round().astype("uint8")
+                    images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
+                    for i, j in enumerate(images):
+                        cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
 
-                        inds_output = [False if pred is None else True for pred in all_preds]
-                        # inds_cal_loss = [i & j for i, j in zip(inds_input, inds_output)]
-                        embeddings_gt = face_embeddings[inds_input][inds_output]
-
-                        if len(embeddings_gt):
-
-                            embeddings = []
-                            for face_ind, pred in enumerate(all_preds):
-                                if pred is not None:
-                                    face = self.grid_sampler.run(latents[face_ind], pred)
-                                    face /= 255.0
-                                    face -= 0.5
-                                    face /= 0.5
-                                    embedding = torch.Tensor(self.recognizer.extract(face)).to(
-                                        memory_format=torch.contiguous_format).float().to(self.accelerator.device)
-                                else:
-                                    embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
-                                embeddings.append(embedding)
-
-                            # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
-                            embeddings = torch.concat(embeddings, dim=0)
-                            # print(source_embeddings.shape, embeddings.shape)
-                            cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
-                            print('cal cos', cos_sim.item())
-                            loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
+                    all_preds = []
+                    for image in images:
+                        try:
+                            preds = self.detector.detect(image)
+                        except Exception as e:
+                            print(e)
+                            all_preds.append(None)
+                            continue
+                        if preds:
+                            all_preds.append(preds[0])
                         else:
-                            loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+                            all_preds.append(None)
+
+                    inds_output = [False if pred is None else True for pred in all_preds]
+                    # inds_cal_loss = [i & j for i, j in zip(inds_input, inds_output)]
+                    embeddings_gt = face_embeddings[inds_input][inds_output]
+
+                    if len(embeddings_gt):
+
+                        embeddings = []
+                        for face_ind, pred in enumerate(all_preds):
+                            if pred is not None:
+                                face = self.grid_sampler.run(latents[face_ind], pred)
+                                face /= 255.0
+                                face -= 0.5
+                                face /= 0.5
+                                embedding = torch.Tensor(self.recognizer.extract(face)).to(
+                                    memory_format=torch.contiguous_format).float().to(self.accelerator.device)
+                            else:
+                                embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
+                            embeddings.append(embedding)
+
+                        # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
+                        embeddings = torch.concat(embeddings, dim=0)
+                        # print(source_embeddings.shape, embeddings.shape)
+                        cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
+                        print('cal cos', cos_sim.item())
+                        loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
+                    else:
+                        loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
 
                     # Gather the losses across all processes for logging (if we use distributed training).
                     avg_loss = self.accelerator.gather(loss.repeat(self.args.train_batch_size)).mean()
