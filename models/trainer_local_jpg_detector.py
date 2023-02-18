@@ -74,7 +74,8 @@ class Trainer:
         #     '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
         # )
         with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
-            self.image_files = f.readlines()
+            image_files = f.readlines()
+            self.image_files = [file[:-1] for file in image_files]
 
         # Freeze vae and text_encoder
         self.vae.requires_grad_(True)
