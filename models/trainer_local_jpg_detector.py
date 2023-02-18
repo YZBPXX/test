@@ -238,7 +238,7 @@ class Trainer:
                     pixel_values = batch["pixel_values"].to(self.accelerator.device, dtype=self.weight_dtype)
                     latents = self.vae.encode(pixel_values.to(self.accelerator.device, dtype=self.weight_dtype)).latent_dist.sample()
                     latents = latents * 0.18215
-                    detector_input = batch["detector_input"].numpy().permute(0, 2, 3, 1)
+                    detector_input = batch["detector_input"].permute(0, 2, 3, 1).numpy()
 
                     preds = [self.detector.detect_and_align(image) for image in detector_input]
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
