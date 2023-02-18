@@ -316,20 +316,31 @@ class Trainer:
 
                     if len(embeddings_gt):
 
-                        embeddings = []
+                        # embeddings = []
+                        # for face_ind, pred in enumerate(all_preds):
+                        #     if pred is not None:
+                        #         face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
+                        #         face /= 255.0
+                        #         face -= 0.5
+                        #         face /= 0.5
+                        #         embedding = self.recognizer_pth(face)
+                        #     else:
+                        #         embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
+                        #     embeddings.append(embedding)
+                        # embeddings = torch.concat(embeddings, dim=0)
+
+                        grid_embeddings = []
                         for face_ind, pred in enumerate(all_preds):
                             if pred is not None:
                                 face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
                                 face /= 255.0
                                 face -= 0.5
                                 face /= 0.5
-                                embedding = self.recognizer_pth(face)
-                            else:
-                                embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
-                            embeddings.append(embedding)
+                                grid_embeddings.append(face)
+                        grid_embeddings = torch.concat(grid_embeddings, dim=0)
+                        embeddings = self.recognizer_pth(grid_embeddings)
 
                         # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
-                        embeddings = torch.concat(embeddings, dim=0)
                         # print(source_embeddings.shape, embeddings.shape)
                         # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
                         target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
@@ -337,7 +348,7 @@ class Trainer:
                         # torch.nn.CosineEmbeddingLoss
                         # numerator = embeddings_gt * embeddings
                         # denominator = torch.sqrt()
-                        print('cal cos', cos_sim.item())
+                        print('cal cos', cos_sim.item(), embeddings_gt.shape, embeddings.shape, target.shape)
                         loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
                     else:
                         loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
