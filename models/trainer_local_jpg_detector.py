@@ -20,7 +20,7 @@ from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNe
 from torchvision import transforms
 from datas.image_file_dataset import ImageData
 from models.arcface_proj import ArcFaceProj
-from utils.arcface.arcface_res50_model import Arcface
+from utils.arcface.arcface_res50_model import Arcface, Arcface2
 from utils.read_dir import get_file_from_dir
 from utils.arcface.recognizor import ArcFace_Onnx
 from utils.arcface.face_align import alignment_procedure
@@ -75,7 +75,7 @@ class Trainer:
         self.proj.load_state_dict({k.replace('module.', ''): v for k, v in ckpt.items()})
         self.detector = YoloFace(self.RANK % 8)
         self.recognizer = ArcFace_Onnx(self.RANK % 8)
-        self.recognizer_pth = Arcface()
+        self.recognizer_pth = Arcface2()
         # self.image_files = get_file_from_dir(
         #     '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
         # )
@@ -344,8 +344,8 @@ class Trainer:
                         # print(source_embeddings.shape, embeddings.shape)
                         # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
                         target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
-                        # cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
-                        cos_sim = F.l1_loss(embeddings_gt, embeddings)
+                        cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
+                        # cos_sim = F.l1_loss(embeddings_gt, embeddings)
                         # torch.nn.CosineEmbeddingLoss
                         # numerator = embeddings_gt * embeddings
                         # denominator = torch.sqrt()
