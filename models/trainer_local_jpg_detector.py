@@ -318,8 +318,7 @@ class Trainer:
                                 face /= 255.0
                                 face -= 0.5
                                 face /= 0.5
-                                embedding = torch.Tensor(self.recognizer.extract(face)).to(
-                                    memory_format=torch.contiguous_format).float().to(self.accelerator.device)
+                                embedding = self.recognizer_pth(face)
                             else:
                                 embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
                             embeddings.append(embedding)
