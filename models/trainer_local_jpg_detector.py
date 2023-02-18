@@ -244,6 +244,7 @@ class Trainer:
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
                     faces = [pred[0] for pred in preds if len(pred) == 1]
                     encoder_hidden_states = self.text_encoder(batch["input_ids"].to(self.accelerator.device))[0]
+                    print(len(faces), 'len faces')
 
                     if len(faces):
                         faces = np.array(faces)
