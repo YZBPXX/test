@@ -156,10 +156,13 @@ class Trainer:
         )
 
         self.image_dataset = ImageData(self.image_files, self.vae_transforms, self.yolo_transforms, self.tokenizer)
-        self.train_dataloader = iter(
-            torch.utils.data.DataLoader(
-                self.image_dataset, shuffle=True, collate_fn=self.collate_fn, batch_size=args.train_batch_size
-            )
+        # self.train_dataloader = iter(
+        #     torch.utils.data.DataLoader(
+        #         self.image_dataset, shuffle=True, collate_fn=self.collate_fn, batch_size=args.train_batch_size
+        #     )
+        # )
+        self.train_dataloader = torch.utils.data.DataLoader(
+            self.image_dataset, shuffle=True, collate_fn=self.collate_fn, batch_size=args.train_batch_size
         )
         self.unet, self.proj, self.optimizer, self.optimizer_proj, self.train_dataloader, self.lr_scheduler = self.accelerator.prepare(
             self.unet, self.proj, self.optimizer, self.optimizer_proj, self.train_dataloader, self.lr_scheduler
@@ -241,6 +244,9 @@ class Trainer:
                     detector_input = batch["detector_input"].permute(0, 2, 3, 1).numpy()
 
                     preds = [self.detector.detect_and_align(image) for image in detector_input]
+                    print(len(preds), 'len preds')
+                    for faces in preds:
+                        print(len(faces), 'face count in each image')
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
                     faces = [pred[0] for pred in preds if len(pred) == 1]
                     encoder_hidden_states = self.text_encoder(batch["input_ids"].to(self.accelerator.device))[0]
