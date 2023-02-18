@@ -260,7 +260,7 @@ class Trainer:
                     # if len(faces):
                     # faces = np.array(faces)
                     # print(faces.shape)
-                    faces = [self.arcface_transform(face) for face in faces]
+                    faces = [self.arcface_transform(face.astype(np.float32)) for face in faces]
                     faces = np.stack(faces, axis=0).astype(np.float32)
                     face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                     embeddings = self.proj(face_embeddings)
