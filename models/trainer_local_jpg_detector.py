@@ -300,7 +300,7 @@ class Trainer:
                             print(e)
                             all_preds.append(None)
                             continue
-                        if preds:
+                        if len(preds):
                             all_preds.append(preds[0])
                         else:
                             all_preds.append(None)
