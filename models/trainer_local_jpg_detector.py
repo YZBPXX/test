@@ -344,7 +344,8 @@ class Trainer:
                         # print(source_embeddings.shape, embeddings.shape)
                         # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
                         target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
-                        cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
+                        # cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
+                        cos_sim = F.l1_loss(embeddings_gt, embeddings)
                         # torch.nn.CosineEmbeddingLoss
                         # numerator = embeddings_gt * embeddings
                         # denominator = torch.sqrt()
