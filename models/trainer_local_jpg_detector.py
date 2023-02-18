@@ -243,169 +243,166 @@ class Trainer:
             train_loss = 0.0
 
             for step, batch in enumerate(self.train_dataloader):
-                try:
-                    with self.accelerator.accumulate(self.unet):
-                        # Convert images to latent space
-                        pixel_values = batch["pixel_values"].to(self.accelerator.device, dtype=self.weight_dtype)
-                        latents = self.vae.encode(pixel_values.to(self.accelerator.device, dtype=self.weight_dtype)).latent_dist.sample()
-                        latents = latents * 0.18215
-                        detector_input = batch["detector_input"].permute(0, 2, 3, 1).cpu().numpy() * 255
-                        detector_input = detector_input.astype(np.uint8)
-                        # for i, j in enumerate(detector_input):
-                        #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
+                with self.accelerator.accumulate(self.unet):
+                    # Convert images to latent space
+                    pixel_values = batch["pixel_values"].to(self.accelerator.device, dtype=self.weight_dtype)
+                    latents = self.vae.encode(pixel_values.to(self.accelerator.device, dtype=self.weight_dtype)).latent_dist.sample()
+                    latents = latents * 0.18215
+                    detector_input = batch["detector_input"].permute(0, 2, 3, 1).cpu().numpy() * 255
+                    detector_input = detector_input.astype(np.uint8)
+                    # for i, j in enumerate(detector_input):
+                    #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
 
-                        preds = [self.detector.detect_and_align(image) for image in detector_input]
-                        # print(len(preds), 'len preds')
-                        # for faces in preds:
-                        #     print(len(faces), 'face count in each image')
-                        inds_input = [True if len(pred) == 1 else False for pred in preds]
-                        faces = [pred[0] if len(pred) == 1 else np.zeros((112, 112, 3)) for pred in preds]
-                        encoder_hidden_states = self.text_encoder(batch["input_ids"].to(self.accelerator.device))[0]
-                        # print(len(faces), 'len faces')
+                    preds = [self.detector.detect_and_align(image) for image in detector_input]
+                    # print(len(preds), 'len preds')
+                    # for faces in preds:
+                    #     print(len(faces), 'face count in each image')
+                    inds_input = [True if len(pred) == 1 else False for pred in preds]
+                    faces = [pred[0] if len(pred) == 1 else np.zeros((112, 112, 3)).astype(np.uint8) for pred in preds]
+                    encoder_hidden_states = self.text_encoder(batch["input_ids"].to(self.accelerator.device))[0]
+                    # print(len(faces), 'len faces')
 
-                        # if len(faces):
-                        # faces = np.array(faces)
-                        # print(faces.shape)
-                        faces = [self.arcface_transform(face) for face in faces]
-                        faces = np.stack(faces, axis=0).astype(np.float32)
-                        face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
-                        embeddings = self.proj(face_embeddings)
-                        # encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
-                        encoder_hidden_states = torch.cat([embeddings, encoder_hidden_states], dim=1)
+                    # if len(faces):
+                    # faces = np.array(faces)
+                    # print(faces.shape)
+                    faces = [self.arcface_transform(face) for face in faces]
+                    faces = np.stack(faces, axis=0).astype(np.float32)
+                    face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
+                    embeddings = self.proj(face_embeddings)
+                    # encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
+                    encoder_hidden_states = torch.cat([embeddings, encoder_hidden_states], dim=1)
 
-                        noise = torch.randn_like(latents)
-                        timesteps = torch.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],), device=latents.device)
-                        timesteps = timesteps.long()
-                        noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
-                        # Predict the noise residual and compute loss
-                        noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
-                        # if not len(faces):
-                        #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
-                        # else:
-                        # print('decoding', len(noisy_latents[inds_input]))
-                        # latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
-                        # latents = 1 / 0.18215 * latents
-                        # latents = self.vae.decode(latents).sample
-                        # latents = (latents / 2 + 0.5).clamp(0, 1)
-                        # images = torch.zeros_like(latents)
-                        # images.copy_(latents)
-                        # images = images.detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                        # # latents_test = latents.cpu().numpy()
-                        # # images = copy.copy(latents).detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                        # # images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
-                        # images = (images * 255).round().astype("uint8")
-                        # images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
-                        # for i, j in enumerate(images):
-                        #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
-                        #
-                        # all_preds = []
-                        # for image in images:
-                        #     try:
-                        #         preds = self.detector.detect(image)
-                        #     except Exception as e:
-                        #         print(e)
-                        #         all_preds.append(None)
-                        #         continue
-                        #     if len(preds):
-                        #         all_preds.append(preds[0])
-                        #     else:
-                        #         all_preds.append(None)
-                        #
-                        # inds_output = [False if pred is None else True for pred in all_preds]
-                        # # inds_cal_loss = [i & j for i, j in zip(inds_input, inds_output)]
-                        # embeddings_gt = face_embeddings[inds_input][inds_output]
-                        #
-                        # if len(embeddings_gt):
-                        #
-                        #     # embeddings = []
-                        #     # for face_ind, pred in enumerate(all_preds):
-                        #     #     if pred is not None:
-                        #     #         face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
-                        #     #         face /= 255.0
-                        #     #         face -= 0.5
-                        #     #         face /= 0.5
-                        #     #         embedding = self.recognizer_pth(face)
-                        #     #     else:
-                        #     #         embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
-                        #     #     embeddings.append(embedding)
-                        #     # embeddings = torch.concat(embeddings, dim=0)
-                        #
-                        #     grid_embeddings = []
-                        #     for face_ind, pred in enumerate(all_preds):
-                        #         if pred is not None:
-                        #             face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
-                        #             face /= 255.0
-                        #             face -= 0.5
-                        #             face /= 0.5
-                        #             grid_embeddings.append(face)
-                        #     grid_embeddings = torch.concat(grid_embeddings, dim=0)
-                        #     embeddings = self.recognizer_pth(grid_embeddings)
-                        #
-                        #     # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
-                        #     # print(source_embeddings.shape, embeddings.shape)
-                        #     # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
-                        #     target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
-                        #     cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
-                        #     # torch.nn.CosineEmbeddingLoss
-                        #     # numerator = embeddings_gt * embeddings
-                        #     # denominator = torch.sqrt()
-                        #     print('cal cos', cos_sim.item(), embeddings_gt.shape, embeddings.shape, target.shape)
-                        #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
-                        # else:
-                        loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+                    noise = torch.randn_like(latents)
+                    timesteps = torch.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],), device=latents.device)
+                    timesteps = timesteps.long()
+                    noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
+                    # Predict the noise residual and compute loss
+                    noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                    # if not len(faces):
+                    #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+                    # else:
+                    # print('decoding', len(noisy_latents[inds_input]))
+                    # latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
+                    # latents = 1 / 0.18215 * latents
+                    # latents = self.vae.decode(latents).sample
+                    # latents = (latents / 2 + 0.5).clamp(0, 1)
+                    # images = torch.zeros_like(latents)
+                    # images.copy_(latents)
+                    # images = images.detach().cpu().permute(0, 2, 3, 1).float().numpy()
+                    # # latents_test = latents.cpu().numpy()
+                    # # images = copy.copy(latents).detach().cpu().permute(0, 2, 3, 1).float().numpy()
+                    # # images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
+                    # images = (images * 255).round().astype("uint8")
+                    # images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
+                    # for i, j in enumerate(images):
+                    #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
+                    #
+                    # all_preds = []
+                    # for image in images:
+                    #     try:
+                    #         preds = self.detector.detect(image)
+                    #     except Exception as e:
+                    #         print(e)
+                    #         all_preds.append(None)
+                    #         continue
+                    #     if len(preds):
+                    #         all_preds.append(preds[0])
+                    #     else:
+                    #         all_preds.append(None)
+                    #
+                    # inds_output = [False if pred is None else True for pred in all_preds]
+                    # # inds_cal_loss = [i & j for i, j in zip(inds_input, inds_output)]
+                    # embeddings_gt = face_embeddings[inds_input][inds_output]
+                    #
+                    # if len(embeddings_gt):
+                    #
+                    #     # embeddings = []
+                    #     # for face_ind, pred in enumerate(all_preds):
+                    #     #     if pred is not None:
+                    #     #         face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
+                    #     #         face /= 255.0
+                    #     #         face -= 0.5
+                    #     #         face /= 0.5
+                    #     #         embedding = self.recognizer_pth(face)
+                    #     #     else:
+                    #     #         embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
+                    #     #     embeddings.append(embedding)
+                    #     # embeddings = torch.concat(embeddings, dim=0)
+                    #
+                    #     grid_embeddings = []
+                    #     for face_ind, pred in enumerate(all_preds):
+                    #         if pred is not None:
+                    #             face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
+                    #             face /= 255.0
+                    #             face -= 0.5
+                    #             face /= 0.5
+                    #             grid_embeddings.append(face)
+                    #     grid_embeddings = torch.concat(grid_embeddings, dim=0)
+                    #     embeddings = self.recognizer_pth(grid_embeddings)
+                    #
+                    #     # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
+                    #     # print(source_embeddings.shape, embeddings.shape)
+                    #     # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
+                    #     target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
+                    #     cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
+                    #     # torch.nn.CosineEmbeddingLoss
+                    #     # numerator = embeddings_gt * embeddings
+                    #     # denominator = torch.sqrt()
+                    #     print('cal cos', cos_sim.item(), embeddings_gt.shape, embeddings.shape, target.shape)
+                    #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
+                    # else:
+                    loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
 
-                        # Gather the losses across all processes for logging (if we use distributed training).
-                        avg_loss = self.accelerator.gather(loss.repeat(self.args.train_batch_size)).mean()
-                        train_loss += avg_loss.item() / self.args.gradient_accumulation_steps
+                    # Gather the losses across all processes for logging (if we use distributed training).
+                    avg_loss = self.accelerator.gather(loss.repeat(self.args.train_batch_size)).mean()
+                    train_loss += avg_loss.item() / self.args.gradient_accumulation_steps
 
-                        # Backpropagate
-                        self.accelerator.backward(loss)
-                        if self.accelerator.sync_gradients:
-                            self.accelerator.clip_grad_norm_(self.unet.parameters(), self.args.max_grad_norm)
-                            self.accelerator.clip_grad_norm_(self.proj.parameters(), self.args.max_grad_norm)
-
-                        self.optimizer.step()
-                        self.optimizer_proj.step()
-                        self.lr_scheduler.step()
-                        self.lr_scheduler_proj.step()
-                        self.optimizer.zero_grad()
-                        self.optimizer_proj.zero_grad()
-
-                    # Checks if the accelerator has performed an optimization step behind the scenes
+                    # Backpropagate
+                    self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
-                        progress_bar.update(1)
-                        global_step += 1
-                        self.accelerator.log({"train_loss": train_loss}, step=global_step)
-                        train_loss = 0.0
+                        self.accelerator.clip_grad_norm_(self.unet.parameters(), self.args.max_grad_norm)
+                        self.accelerator.clip_grad_norm_(self.proj.parameters(), self.args.max_grad_norm)
 
-                    logs = {"step_loss": loss.detach().item(), "lr": self.lr_scheduler.get_last_lr()[0]}
-                    progress_bar.set_postfix(**logs)
+                    self.optimizer.step()
+                    self.optimizer_proj.step()
+                    self.lr_scheduler.step()
+                    self.lr_scheduler_proj.step()
+                    self.optimizer.zero_grad()
+                    self.optimizer_proj.zero_grad()
 
-                    if global_step >= self.args.max_train_steps:
-                        self.accelerator.end_training()
-                        return
+                # Checks if the accelerator has performed an optimization step behind the scenes
+                if self.accelerator.sync_gradients:
+                    progress_bar.update(1)
+                    global_step += 1
+                    self.accelerator.log({"train_loss": train_loss}, step=global_step)
+                    train_loss = 0.0
 
-                    if self.RANK == 0 and global_step % 5000 == 0 and global_step != 0:
-                        pipeline = StableDiffusionPipeline(
-                            text_encoder=self.text_encoder,
-                            vae=self.vae,
-                            unet=self.accelerator.unwrap_model(self.unet),
-                            tokenizer=self.tokenizer,
-                            scheduler=EulerAncestralDiscreteScheduler(
-                                beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000,
-                            ),
-                            safety_checker=StableDiffusionSafetyChecker.from_pretrained(
-                                "CompVis/stable-diffusion-safety-checker"),
-                            feature_extractor=CLIPFeatureExtractor.from_pretrained("openai/clip-vit-base-patch32"),
-                        )
-                        os.makedirs(self.args.output_dir + '/%d_%d/' % (1, global_step), exist_ok=True)
-                        pipeline.save_pretrained(self.args.output_dir + '/%d_%d/' % (1, global_step))
-                        torch.save(
-                            self.proj.state_dict(),
-                            self.args.output_dir + '/%d_%d/' % (1, global_step) + 'proj.ckpt',
-                        )
-                except Exception as e:
-                    print(e)
+                logs = {"step_loss": loss.detach().item(), "lr": self.lr_scheduler.get_last_lr()[0]}
+                progress_bar.set_postfix(**logs)
+
+                if global_step >= self.args.max_train_steps:
+                    self.accelerator.end_training()
+                    return
+
+                if self.RANK == 0 and global_step % 5000 == 0 and global_step != 0:
+                    pipeline = StableDiffusionPipeline(
+                        text_encoder=self.text_encoder,
+                        vae=self.vae,
+                        unet=self.accelerator.unwrap_model(self.unet),
+                        tokenizer=self.tokenizer,
+                        scheduler=EulerAncestralDiscreteScheduler(
+                            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000,
+                        ),
+                        safety_checker=StableDiffusionSafetyChecker.from_pretrained(
+                            "CompVis/stable-diffusion-safety-checker"),
+                        feature_extractor=CLIPFeatureExtractor.from_pretrained("openai/clip-vit-base-patch32"),
+                    )
+                    os.makedirs(self.args.output_dir + '/%d_%d/' % (1, global_step), exist_ok=True)
+                    pipeline.save_pretrained(self.args.output_dir + '/%d_%d/' % (1, global_step))
+                    torch.save(
+                        self.proj.state_dict(),
+                        self.args.output_dir + '/%d_%d/' % (1, global_step) + 'proj.ckpt',
+                    )
 
         self.accelerator.end_training()
 
