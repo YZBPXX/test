@@ -5,6 +5,9 @@ import torch.nn.functional as F
 
 
 class GridSampler:
+    def __init__(self, device):
+        self.device = device
+
     @staticmethod
     def euclidean_distance(source_representation, test_representation):
         euclidean_distance = source_representation - test_representation
@@ -66,12 +69,12 @@ class GridSampler:
         return [x1, y1, x2, y2], [left_eye, right_eye]
 
     @staticmethod
-    def grid_samle(face_tensor, angle):
+    def grid_samle(face_tensor, angle, device):
         theta = [
             [np.cos(angle), -np.sin(angle), 0.],
             [np.sin(angle), np.cos(angle), 0.]
         ]
-        theta = torch.Tensor(theta).unsqueeze(0)
+        theta = torch.Tensor(theta).unsqueeze(0).to(device)
         # grid is of size NxHxWx2
         grid = F.affine_grid(theta, face_tensor.size(), align_corners=False)
         x = F.grid_sample(face_tensor, grid, align_corners=False)
@@ -89,7 +92,7 @@ class GridSampler:
         face_tensor = self.crop_tensor(image_tensor, bbox)
         left_eye, right_eye = landmarks
         angle = self.cal_angle(left_eye, right_eye)
-        aligned_face_tensor = self.grid_samle(face_tensor, angle)
+        aligned_face_tensor = self.grid_samle(face_tensor, angle, self.device)
         return aligned_face_tensor
 
 
