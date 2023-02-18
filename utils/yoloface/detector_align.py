@@ -155,8 +155,12 @@ class YoloFace:
             right_eye = points[1]
             right_eye[0] -= top
             right_eye[1] -= left
-            face = self.alignment_procedure(face, left_eye, right_eye)
-            faces.append(face)
+            try:
+                face = self.alignment_procedure(face, left_eye, right_eye)
+                faces.append(face)
+            except Exception as e:
+                print(e)
+                continue
         return faces
 
 
