@@ -281,9 +281,11 @@ class Trainer:
                     latents = 1 / 0.18215 * latents
                     latents = self.vae.decode(latents).sample
                     latents = (latents / 2 + 0.5).clamp(0, 1)
-                    # images = torch.zeros_like(latents)
+                    images = torch.zeros_like(latents)
+                    images.copy_(latents)
+                    images = images.cpu().permute(0, 2, 3, 1).float().numpy()
                     # images = copy.copy(latents).detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                    images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
+                    # images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
                     images = (images * 255).round().astype("uint8")
                     images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
                     for i, j in enumerate(images):
