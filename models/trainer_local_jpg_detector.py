@@ -241,7 +241,7 @@ class Trainer:
                     pixel_values = batch["pixel_values"].to(self.accelerator.device, dtype=self.weight_dtype)
                     latents = self.vae.encode(pixel_values.to(self.accelerator.device, dtype=self.weight_dtype)).latent_dist.sample()
                     latents = latents * 0.18215
-                    detector_input = batch["detector_input"].permute(0, 2, 3, 1).cpu().numpy() * 255
+                    detector_input = batch["detector_input"].permute(0, 2, 3, 1).cpu().numpy()
                     detector_input = detector_input.astype(np.uint8)
                     for i, j in enumerate(detector_input):
                         cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
