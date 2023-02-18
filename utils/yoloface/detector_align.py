@@ -166,7 +166,7 @@ class YoloFace:
 
 if __name__ == '__main__':
     from tqdm import tqdm
-    d = YoloFace()
+    d = YoloFace(0, 'yolov5n-0.5.onnx')
     with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
         image_files = f.readlines()
         image_files = [file[:-1] for file in image_files]
