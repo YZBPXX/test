@@ -949,26 +949,7 @@ class Arcface2(nn.Module):
     t_680 = self.n_BatchNormalization_126(t_679)
     t_681 = self.n_Flatten_127(t_680)
     t_682 = 1.0 * torch.matmul(t_681, torch.transpose(self._vars["fc_weight"], 0, 1)) + 1.0 * self._vars["fc_bias"]
-    # t_682 = torch.unsqueeze(t_682, -1)
+    t_682 = torch.unsqueeze(t_682, -1)
     t_683 = self.n_BatchNormalization_129(t_682)
-    # t_683 = torch.squeeze(t_683, -1)
+    t_683 = torch.squeeze(t_683, -1)
     return t_683
-
-  def compatible_auto_pad(self, input, kernel_spatial_shape, nn_mod, auto_pad=None, **kwargs):
-    input_spatial_shape = input.shape[2:]
-    d = len(input_spatial_shape)
-    strides = nn_mod.stride
-    dilations = nn_mod.dilation
-    output_spatial_shape = [math.ceil(float(l) / float(r)) for l, r in zip(input.shape[2:], strides)]
-    pt_padding = [0] * 2 * d
-    pad_shape = [0] * d
-    for i in range(d):
-      pad_shape[i] = (output_spatial_shape[i] - 1) * strides[i] + ((kernel_spatial_shape[i] - 1) * dilations[i] + 1) - input_spatial_shape[i]
-      mean = pad_shape[i] // 2
-      if auto_pad == b"SAME_UPPER":
-        l, r = pad_shape[i] - mean, mean
-      else:
-        l, r = mean, pad_shape[i] - mean
-      pt_padding.insert(0, r)
-      pt_padding.insert(0, l)
-    return F.pad(input, pt_padding)

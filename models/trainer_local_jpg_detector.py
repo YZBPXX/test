@@ -343,7 +343,8 @@ class Trainer:
                         # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
                         # print(source_embeddings.shape, embeddings.shape)
                         # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
-                        target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
+                        # target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
+                        target = torch.tensor([1.0] * embeddings.shape[0]).to(self.accelerator.device)
                         cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
                         # cos_sim = F.l1_loss(embeddings_gt, embeddings)
                         # torch.nn.CosineEmbeddingLoss
