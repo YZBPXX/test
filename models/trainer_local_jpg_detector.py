@@ -256,8 +256,10 @@ class Trainer:
                     # print(len(faces), 'len faces')
 
                     if len(faces):
-                        # faces = np.array(faces)
-                        faces = np.array([self.arcface_transform(face) for face in faces]).astype(np.float32)
+                        faces = np.array(faces)
+                        print(faces.shape)
+                        faces = [self.arcface_transform(face) for face in faces]
+                        faces = np.array(faces).astype(np.float32)
                         face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                         embeddings = self.proj(face_embeddings)
                         encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
