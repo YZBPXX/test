@@ -314,7 +314,7 @@ class Trainer:
                         embeddings = []
                         for face_ind, pred in enumerate(all_preds):
                             if pred is not None:
-                                face = self.grid_sampler.run(latents[face_ind], pred)
+                                face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
                                 face /= 255.0
                                 face -= 0.5
                                 face /= 0.5
