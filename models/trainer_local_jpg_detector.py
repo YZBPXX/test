@@ -70,9 +70,11 @@ class Trainer:
         self.detector = YoloFace(self.RANK % 8)
         self.recognizer = ArcFace_Onnx(self.RANK % 8)
         self.recognizer_pth = Arcface()
-        self.image_files = get_file_from_dir(
-            '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
-        )
+        # self.image_files = get_file_from_dir(
+        #     '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
+        # )
+        with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
+            self.image_files = f.readlines()
 
         # Freeze vae and text_encoder
         self.vae.requires_grad_(True)

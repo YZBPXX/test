@@ -36,8 +36,8 @@ class ImageData(data.Dataset):
                 if prompt_list[0].endswith(('.jpg', '.png')):
                     prompt = ' '.join(prompt_list[1:])
                 prompt = 'sai style, ' + prompt
-            elif 'see' in self.files[data_index]:
-                prompt = 'sai style, a people'
+            elif 'aahq-dataset' in self.files[data_index]:
+                prompt = 'sai style'
             else:
                 prompt = 'a people'
 
