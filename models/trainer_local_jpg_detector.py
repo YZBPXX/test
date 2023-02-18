@@ -40,6 +40,11 @@ logging.basicConfig(
 )
 
 
+# def normalize(x, axis=-1):
+#     x = 1. * x / (torch.norm(x, 2, axis, keepdim=True).expand_as(x) + 1e-12)
+#     return x
+
+
 class Trainer:
     def __init__(self, args):
         self.args = args
@@ -260,7 +265,7 @@ class Trainer:
                     # if len(faces):
                     # faces = np.array(faces)
                     # print(faces.shape)
-                    faces = [self.arcface_transform(face.astype(np.float32)) for face in faces]
+                    faces = [self.arcface_transform(face) for face in faces]
                     faces = np.stack(faces, axis=0).astype(np.float32)
                     face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                     embeddings = self.proj(face_embeddings)
@@ -277,60 +282,65 @@ class Trainer:
                     #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
                     # else:
                     # print('decoding', len(noisy_latents[inds_input]))
-                    # latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
-                    # latents = 1 / 0.18215 * latents
-                    # latents = self.vae.decode(latents).sample
-                    # latents = (latents / 2 + 0.5).clamp(0, 1)
-                    # images = torch.zeros_like(latents)
-                    # images.copy_(latents)
-                    # images = images.detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                    # # latents_test = latents.cpu().numpy()
-                    # # images = copy.copy(latents).detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                    # # images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
-                    # images = (images * 255).round().astype("uint8")
-                    # images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
-                    # for i, j in enumerate(images):
-                    #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
-                    #
-                    # all_preds = []
-                    # for image in images:
-                    #     try:
-                    #         preds = self.detector.detect(image)
-                    #     except Exception as e:
-                    #         print(e)
-                    #         all_preds.append(None)
-                    #         continue
-                    #     if len(preds):
-                    #         all_preds.append(preds[0])
-                    #     else:
-                    #         all_preds.append(None)
-                    #
-                    # inds_output = [False if pred is None else True for pred in all_preds]
-                    # # inds_cal_loss = [i & j for i, j in zip(inds_input, inds_output)]
-                    # embeddings_gt = face_embeddings[inds_input][inds_output]
-                    #
-                    # if len(embeddings_gt):
-                    #
-                    #     embeddings = []
-                    #     for face_ind, pred in enumerate(all_preds):
-                    #         if pred is not None:
-                    #             face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
-                    #             face /= 255.0
-                    #             face -= 0.5
-                    #             face /= 0.5
-                    #             embedding = self.recognizer_pth(face)
-                    #         else:
-                    #             embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
-                    #         embeddings.append(embedding)
-                    #
-                    #     # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
-                    #     embeddings = torch.concat(embeddings, dim=0)
-                    #     # print(source_embeddings.shape, embeddings.shape)
-                    #     cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
-                    #     # print('cal cos', cos_sim.item())
-                    #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
-                    # else:
-                    loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+                    latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
+                    latents = 1 / 0.18215 * latents
+                    latents = self.vae.decode(latents).sample
+                    latents = (latents / 2 + 0.5).clamp(0, 1)
+                    images = torch.zeros_like(latents)
+                    images.copy_(latents)
+                    images = images.detach().cpu().permute(0, 2, 3, 1).float().numpy()
+                    # latents_test = latents.cpu().numpy()
+                    # images = copy.copy(latents).detach().cpu().permute(0, 2, 3, 1).float().numpy()
+                    # images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
+                    images = (images * 255).round().astype("uint8")
+                    images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
+                    for i, j in enumerate(images):
+                        cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
+
+                    all_preds = []
+                    for image in images:
+                        try:
+                            preds = self.detector.detect(image)
+                        except Exception as e:
+                            print(e)
+                            all_preds.append(None)
+                            continue
+                        if len(preds):
+                            all_preds.append(preds[0])
+                        else:
+                            all_preds.append(None)
+
+                    inds_output = [False if pred is None else True for pred in all_preds]
+                    # inds_cal_loss = [i & j for i, j in zip(inds_input, inds_output)]
+                    embeddings_gt = face_embeddings[inds_input][inds_output]
+
+                    if len(embeddings_gt):
+
+                        embeddings = []
+                        for face_ind, pred in enumerate(all_preds):
+                            if pred is not None:
+                                face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
+                                face /= 255.0
+                                face -= 0.5
+                                face /= 0.5
+                                embedding = self.recognizer_pth(face)
+                            else:
+                                embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
+                            embeddings.append(embedding)
+
+                        # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
+                        embeddings = torch.concat(embeddings, dim=0)
+                        # print(source_embeddings.shape, embeddings.shape)
+                        # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
+                        target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
+                        cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
+                        # torch.nn.CosineEmbeddingLoss
+                        # numerator = embeddings_gt * embeddings
+                        # denominator = torch.sqrt()
+                        print('cal cos', cos_sim.item())
+                        loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
+                    else:
+                        loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
 
                     # Gather the losses across all processes for logging (if we use distributed training).
                     avg_loss = self.accelerator.gather(loss.repeat(self.args.train_batch_size)).mean()
