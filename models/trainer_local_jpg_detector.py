@@ -284,7 +284,7 @@ class Trainer:
                     images = torch.zeros_like(latents)
                     images.copy_(latents)
                     images = images.detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                    latents_test = latents.cpu().numpy()
+                    # latents_test = latents.cpu().numpy()
                     # images = copy.copy(latents).detach().cpu().permute(0, 2, 3, 1).float().numpy()
                     # images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
                     images = (images * 255).round().astype("uint8")
