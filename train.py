@@ -14,7 +14,7 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/data/storage1/nas/bo.zhu/checkpoints/diffusion/sd-model-0217-text-arcface-face-loss/",
+        default="/data/storage1/nas/bo.zhu/checkpoints/diffusion/sd-model-0218-text-arcface-face-loss/",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
@@ -27,7 +27,7 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--train_batch_size", type=int, default=2, help="Batch size (per device) for the training dataloader."
+        "--train_batch_size", type=int, default=4, help="Batch size (per device) for the training dataloader."
     )
     parser.add_argument("--num_train_epochs", type=int, default=100000)
     parser.add_argument(
