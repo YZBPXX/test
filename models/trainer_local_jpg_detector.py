@@ -263,7 +263,8 @@ class Trainer:
                     faces = np.stack(faces, axis=0).astype(np.float32)
                     face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                     embeddings = self.proj(face_embeddings)
-                    encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
+                    # encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
+                    encoder_hidden_states = torch.cat([embeddings, encoder_hidden_states], dim=1)
 
                     noise = torch.randn_like(latents)
                     timesteps = torch.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],), device=latents.device)
