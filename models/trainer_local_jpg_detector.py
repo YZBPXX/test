@@ -261,6 +261,7 @@ class Trainer:
                     if not len(faces):
                         loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
                     else:
+                        print('decoding', len(noisy_latents[inds_input]))
                         latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
                         latents = 1 / 0.18215 * latents
                         latents = self.vae.decode(latents).sample
@@ -273,6 +274,7 @@ class Trainer:
                             try:
                                 preds = self.detector.detect(image)
                             except Exception as e:
+                                print(e)
                                 all_preds.append(None)
                                 continue
                             if preds:
