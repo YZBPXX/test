@@ -13,7 +13,7 @@ def get_file_from_dir(dir_name, exts=('.arrow', )):
 if __name__ == '__main__':
     path = '/home/bo.zhu/Projects/aahq-dataset/raw/'
     path = '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/characters_upscaled/'
-    path = '/data/storage1/public/bo.zhu/datasets/text2img/characters_upscaled/seeprettyfaces/'
+    path = '/data/storage1/public/bo.zhu/datasets/text2img/seeprettyfaces/'
     files = get_file_from_dir(path, ('.jpg', '.png'))
     # target_file = '/home/bo.zhu/Projects/aahq-dataset/'
     target_file = '/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx'
