@@ -303,6 +303,7 @@ class Trainer:
                             embeddings = torch.concat(embeddings, dim=0)
                             # print(source_embeddings.shape, embeddings.shape)
                             cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
+                            print('cal cos', cos_sim.item())
                             loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
                         else:
                             loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
