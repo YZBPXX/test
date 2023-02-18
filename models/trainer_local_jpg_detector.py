@@ -73,7 +73,8 @@ class Trainer:
         # self.image_files = get_file_from_dir(
         #     '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
         # )
-        with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
+        # with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
+        with open('/data/storage1/public/bo.zhu/datasets/text2img/train_face_0218.idx', 'r') as f:
             image_files = f.readlines()
             self.image_files = [file[:-1] for file in image_files]
 

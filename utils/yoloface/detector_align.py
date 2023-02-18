@@ -164,3 +164,17 @@ class YoloFace:
         return faces
 
 
+if __name__ == '__main__':
+    from tqdm import tqdm
+    d = YoloFace()
+    with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
+        image_files = f.readlines()
+        image_files = [file[:-1] for file in image_files]
+
+    with open('/data/storage1/public/bo.zhu/datasets/text2img/train_face_0218.idx', 'r') as f:
+        for image_file in tqdm(image_files):
+            image = cv2.imread(image_file)
+            pred = d.detect(image)
+            if len(pred):
+                f.write(image_file + '\n')
+
