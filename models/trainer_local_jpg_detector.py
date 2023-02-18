@@ -247,16 +247,16 @@ class Trainer:
                         cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
 
                     preds = [self.detector.detect_and_align(image) for image in detector_input]
-                    print(len(preds), 'len preds')
-                    for faces in preds:
-                        print(len(faces), 'face count in each image')
+                    # print(len(preds), 'len preds')
+                    # for faces in preds:
+                    #     print(len(faces), 'face count in each image')
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
                     faces = [pred[0] for pred in preds if len(pred) == 1]
                     encoder_hidden_states = self.text_encoder(batch["input_ids"].to(self.accelerator.device))[0]
-                    print(len(faces), 'len faces')
+                    # print(len(faces), 'len faces')
 
                     if len(faces):
-                        faces = np.array(faces)
+                        # faces = np.array(faces)
                         faces = np.array([self.arcface_transform(face) for face in faces]).astype(np.float32)
                         face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                         embeddings = self.proj(face_embeddings)
