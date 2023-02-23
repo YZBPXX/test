@@ -1,6 +1,6 @@
 import argparse
 import os
-from models.trainer_local_jpg_detector import Trainer
+from models.trainer import Trainer
 
 
 def parse_args():

@@ -1,8 +1,5 @@
-import copy
-import json
 import logging
 import os
-import io
 import warnings
 import cv2
 import torch
@@ -13,21 +10,16 @@ from PIL import Image
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPFeatureExtractor
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from datasets.arrow_dataset import Dataset
 from diffusers.optimization import get_scheduler
 from diffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
 from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel, EulerAncestralDiscreteScheduler
 from torchvision import transforms
-from datas.image_file_dataset import ImageData
+from datas.datasets import ImageData
 from models.arcface_proj import ArcFaceProj
-from utils.arcface.arcface_res50_model import Arcface, Arcface2
-from utils.read_dir import get_file_from_dir
+from utils.arcface.arcface_res50_model import Arcface
 from utils.arcface.recognizor import ArcFace_Onnx
-from utils.arcface.face_align import alignment_procedure
-from utils.face_center_crop_images import process_image, crop_and_mask_image
 from utils.yoloface.detector_align import YoloFace
-from utils.face_region_grid_sample import GridSampler
-from utils.read_dir import get_file_from_dir
+from utils.grid_sample import GridSampler
 
 
 torch.set_num_threads(4)
@@ -38,11 +30,6 @@ logging.basicConfig(
     datefmt="%m/%d/%Y %H:%M:%S",
     level=logging.INFO,
 )
-
-
-# def normalize(x, axis=-1):
-#     x = 1. * x / (torch.norm(x, 2, axis, keepdim=True).expand_as(x) + 1e-12)
-#     return x
 
 
 class Trainer:
@@ -75,12 +62,11 @@ class Trainer:
         self.proj.load_state_dict({k.replace('module.', ''): v for k, v in ckpt.items()})
         self.detector = YoloFace(self.RANK % 8)
         self.recognizer = ArcFace_Onnx(self.RANK % 8)
-        self.recognizer_pth = Arcface2()
+        self.recognizer_pth = Arcface()
         # self.image_files = get_file_from_dir(
         #     '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
         # )
         with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
-        # with open('/data/storage1/public/bo.zhu/datasets/text2img/train_face_0218.idx', 'r') as f:
             image_files = f.readlines()
             self.image_files = [file[:-1] for file in image_files]
 
@@ -163,11 +149,6 @@ class Trainer:
         )
 
         self.image_dataset = ImageData(self.image_files, self.vae_transforms, self.yolo_transforms, self.tokenizer)
-        # self.train_dataloader = iter(
-        #     torch.utils.data.DataLoader(
-        #         self.image_dataset, shuffle=True, collate_fn=self.collate_fn, batch_size=args.train_batch_size
-        #     )
-        # )
         self.train_dataloader = torch.utils.data.DataLoader(
             self.image_dataset, shuffle=True, collate_fn=self.collate_fn, batch_size=args.train_batch_size
         )
@@ -250,38 +231,26 @@ class Trainer:
                     latents = latents * 0.18215
                     detector_input = batch["detector_input"].permute(0, 2, 3, 1).cpu().numpy() * 255
                     detector_input = detector_input.astype(np.uint8)
-                    # for i, j in enumerate(detector_input):
-                    #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
 
                     preds = [self.detector.detect_and_align(image) for image in detector_input]
-                    # print(len(preds), 'len preds')
-                    # for faces in preds:
-                    #     print(len(faces), 'face count in each image')
                     inds_input = [True if len(pred) == 1 else False for pred in preds]
                     faces = [pred[0] if len(pred) == 1 else np.zeros((112, 112, 3)).astype(np.uint8) for pred in preds]
                     encoder_hidden_states = self.text_encoder(batch["input_ids"].to(self.accelerator.device))[0]
-                    # print(len(faces), 'len faces')
 
-                    # if len(faces):
-                    # faces = np.array(faces)
-                    # print(faces.shape)
                     faces = [self.arcface_transform(face) for face in faces]
                     faces = np.stack(faces, axis=0).astype(np.float32)
                     face_embeddings = torch.Tensor(self.recognizer.extract_faces(faces)).to(self.accelerator.device)
                     embeddings = self.proj(face_embeddings)
-                    # encoder_hidden_states[inds_input] = torch.cat([embeddings, encoder_hidden_states[inds_input]], dim=1)
                     encoder_hidden_states = torch.cat([embeddings, encoder_hidden_states], dim=1)
 
                     noise = torch.randn_like(latents)
                     timesteps = torch.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],), device=latents.device)
                     timesteps = timesteps.long()
                     noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
+
                     # Predict the noise residual and compute loss
                     noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
-                    # if not len(faces):
-                    #     loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
-                    # else:
-                    # print('decoding', len(noisy_latents[inds_input]))
+
                     latents = self.sub_noise(noisy_latents[inds_input], noise[inds_input], timesteps[inds_input])
                     latents = 1 / 0.18215 * latents
                     latents = self.vae.decode(latents).sample
@@ -289,13 +258,8 @@ class Trainer:
                     images = torch.zeros_like(latents)
                     images.copy_(latents)
                     images = images.detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                    # latents_test = latents.cpu().numpy()
-                    # images = copy.copy(latents).detach().cpu().permute(0, 2, 3, 1).float().numpy()
-                    # images = copy.copy(latents).cpu().permute(0, 2, 3, 1).float().numpy()
                     images = (images * 255).round().astype("uint8")
                     images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
-                    # for i, j in enumerate(images):
-                    #     cv2.imwrite('/tmp/_catalonia/debug/' + str(i) + '_' + str(self.RANK) +'.jpg', j)
 
                     all_preds = []
                     for image in images:
@@ -315,20 +279,6 @@ class Trainer:
                     embeddings_gt = face_embeddings[inds_input][inds_output]
 
                     if len(embeddings_gt):
-
-                        # embeddings = []
-                        # for face_ind, pred in enumerate(all_preds):
-                        #     if pred is not None:
-                        #         face = self.grid_sampler.run(latents[face_ind].unsqueeze(0), pred)
-                        #         face /= 255.0
-                        #         face -= 0.5
-                        #         face /= 0.5
-                        #         embedding = self.recognizer_pth(face)
-                        #     else:
-                        #         embedding = embeddings_gt[face_ind].unsqueeze(0).to(self.accelerator.device)
-                        #     embeddings.append(embedding)
-                        # embeddings = torch.concat(embeddings, dim=0)
-
                         grid_embeddings = []
                         for face_ind, pred in enumerate(all_preds):
                             if pred is not None:
@@ -340,17 +290,9 @@ class Trainer:
                         grid_embeddings = torch.concat(grid_embeddings, dim=0)
                         embeddings = self.recognizer_pth(grid_embeddings)
 
-                        # embeddings = torch.Tensor(self.recognizer.extract_faces(faces))
-                        # print(source_embeddings.shape, embeddings.shape)
-                        # cos_sim = F.cosine_similarity(embeddings_gt, embeddings, dim=0)
-                        # target = torch.ones([embeddings.shape[0]]).to(self.accelerator.device)
                         target = torch.tensor([1.0] * embeddings.shape[0]).to(self.accelerator.device)
                         cos_sim = F.cosine_embedding_loss(embeddings_gt, embeddings, target)
-                        # cos_sim = F.l1_loss(embeddings_gt, embeddings)
-                        # torch.nn.CosineEmbeddingLoss
-                        # numerator = embeddings_gt * embeddings
-                        # denominator = torch.sqrt()
-                        print('cal cos', cos_sim.item(), embeddings_gt.shape, embeddings.shape, target.shape)
+                        
                         loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean") + cos_sim
                     else:
                         loss = F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
