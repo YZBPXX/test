@@ -16,8 +16,12 @@ from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNe
 from torchvision import transforms
 from datas.datasets import ImageData
 from models.arcface_proj import ArcFaceProj
-from utils.arcface.arcface_res50_model import Arcface
-from utils.arcface.recognizor import ArcFace_Onnx
+# from utils.arcface.arcface_res50_model import Arcface
+from utils.arcface.pytorch_arcface import resnet_face18
+
+# from utils.arcface.recognizor import ArcFace_Onnx
+from utils.arcface.recognizor import ArcFace_Pytorch
+
 from utils.yoloface.detector_align import YoloFace
 from utils.grid_sample import GridSampler
 
@@ -37,7 +41,8 @@ class Trainer:
         self.args = args
         logging_dir = os.path.join(self.args.output_dir, self.args.logging_dir)
         self.logger = get_logger(__name__)
-        self.RANK = int(os.environ.get('RANK'))
+        #self.RANK = int(os.environ.get('RANK'))
+        self.RANK = 0
         self.weight_dtype = torch.float32
 
         self.accelerator = Accelerator(
@@ -61,12 +66,14 @@ class Trainer:
         ckpt = torch.load(self.args.pretrained_model_name_or_path + 'proj.ckpt')
         self.proj.load_state_dict({k.replace('module.', ''): v for k, v in ckpt.items()})
         self.detector = YoloFace(self.RANK % 8)
-        self.recognizer = ArcFace_Onnx(self.RANK % 8)
-        self.recognizer_pth = Arcface()
+        self.recognizer = ArcFace_Pytorch(self.RANK % 8)
+        #
+        self.recognizer_pth = resnet_face18()
+        # self.recognizer_pth = Arcface()
         # self.image_files = get_file_from_dir(
         #     '/data/storage1/public/bo.zhu/datasets/text2img/mj_yzb_0213/'
         # )
-        with open('/data/storage1/public/bo.zhu/datasets/text2img/train_0218.idx', 'r') as f:
+        with open('/mnt/share/test.idx', 'r') as f:
             image_files = f.readlines()
             self.image_files = [file[:-1] for file in image_files]
 
